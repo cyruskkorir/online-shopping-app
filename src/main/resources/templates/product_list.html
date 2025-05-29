@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Product Catalog</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+            .container { display: flex; flex-wrap: wrap; gap: 30px; }
+            .products-list, .cart-section { background-color: #fff; border: 1px solid #ddd; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .products-list { flex: 3; min-width: 300px; }
+            .cart-section { flex: 2; min-width: 300px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid #e0e0e0; padding: 10px 12px; text-align: left; vertical-align: middle; }
+            th { background-color: #007bff; color: white; font-weight: bold; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            .quantity-input { width: 60px; text-align: center; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+            .total-price, #grand-total { font-weight: bold; color: #28a745; }
+            button { padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s ease-in-out; }
+            button:hover { background-color: #0056b3; }
+            button.remove-btn { background-color: #dc3545; }
+            button.remove-btn:hover { background-color: #c82333; }
+            button.checkout-btn { background-color: #28a745; margin-top:10px; width: 100%; padding: 12px; }
+            button.checkout-btn:hover { background-color: #218838; }
+            h2, h3 { color: #0056b3; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; }
+            .empty-cart-message, .no-products-message { text-align: center; color: #777; padding: 20px; }
+        </style>
+    </head>
+    <body>
+
+        <div class="container">
+            <!-- Product Listing Section -->
+            <div class="products-list">
+                <h2>Our Products</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Quantity</th>
+                            <th>Item Total</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="product-table-body">
+                        <tr th:each="product : ${products}" th:id="'product-' + ${product.id}">
+                            <td th:text="${product.name}">Product Name</td>
+                            <td th:text="${#numbers.formatDecimal(product.price, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+                            <td>
+                                <input type="number" class="quantity-input" th:id="'quantity-' + ${product.id}" value="1" min="1"                                       
+                                       th:data-product-id="${product.id}"
+                                       th:data-product-price="${product.price}"
+                                       onchange="handleQuantityChange(this)">
+                            </td>
+                            <td th:id="'item-total-' + ${product.id}" th:text="${#numbers.formatDecimal(product.price, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+                            <td>
+                                <button 
+                                    th:data-product-id="${product.id}"
+                                    th:data-product-name="${product.name}"
+                                    th:data-product-price="${product.price}"
+                                    onclick="handleAddToCart(this)">
+                                    Add to Cart
+                                </button>
+                            </td>
+                        </tr>
+                        <tr th:if="${products == null or #lists.isEmpty(products)}">
+                            <td colspan="5" class="no-products-message">No products available at the moment.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Cart Section -->
+            <div class="cart-section">
+                <h3>Shopping Cart</h3>
+                <table id="cart-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cart-items">
+                        <!-- Cart items will be dynamically inserted here by JavaScript -->
+                    </tbody>
+                </table>
+                <div style="text-align: right; margin-top: 20px; padding-top:10px; border-top: 1px solid #eee;">
+                    <strong>Grand Total: <span id="grand-total" class="total-price">0.00</span></strong>
+                </div>
+                <div style="text-align: right; margin-top: 10px;">
+                     <button onclick="checkout()" class="checkout-btn">Checkout</button>
+                </div>
+            </div>
+        </div>
+
+        <script th:inline="javascript">
+        /*<![CDATA[*/
+            let cart = []; // Array to store cart items: { id, name, price, quantity, itemTotal }
+
+            function formatCurrency(amount) {
+                return amount.toFixed(2);
+            }
+
+            // New handler for quantity change
+            function handleQuantityChange(inputElement) {
+                const productId = inputElement.dataset.productId; // Read from data-product-id
+                const price = parseFloat(inputElement.dataset.productPrice); // Read from data-product-price
+                const quantity = inputElement.value;
+                updateItemTotal(productId, quantity, price); // Call original function
+            }
+
+            // New handler for add to cart button
+            function handleAddToCart(buttonElement) {
+                const productId = buttonElement.dataset.productId;
+                const productName = buttonElement.dataset.productName;
+                const productPrice = parseFloat(buttonElement.dataset.productPrice);
+                addToCart(productId, productName, productPrice); // Call original function
+            }
+
+            function updateItemTotal(productId, quantity, price) {
+                const qty = parseInt(quantity);
+                const quantityInput = document.getElementById('quantity-' + productId);
+
+                if (isNaN(qty) || qty < 1) {
+                    if (quantityInput) quantityInput.value = 1; // Reset to 1 if invalid
+                    document.getElementById('item-total-' + productId).textContent = formatCurrency(price);
+                    return;
+                }
+                const itemTotal = qty * price;
+                document.getElementById('item-total-' + productId).textContent = formatCurrency(itemTotal);
+            }
+
+            function addToCart(productId, productName, productPrice) {
+                const quantityInput = document.getElementById('quantity-' + productId);
+                const quantity = parseInt(quantityInput.value);
+
+                if (isNaN(quantity) || quantity < 1) {
+                    alert("Quantity must be at least 1.");
+                    quantityInput.value = 1;
+                    updateItemTotal(productId, 1, productPrice);
+                    return;
+                }
+
+                const existingItemIndex = cart.findIndex(item => item.id === productId);
+
+                if (existingItemIndex > -1) {
+                    cart[existingItemIndex].quantity += quantity;
+                    cart[existingItemIndex].itemTotal = cart[existingItemIndex].quantity * cart[existingItemIndex].price;
+                } else {
+                    cart.push({
+                        id: productId,
+                        name: productName,
+                        price: productPrice,
+                        quantity: quantity,
+                        itemTotal: quantity * productPrice
+                    });
+                }
+                
+                quantityInput.value = 1; // Reset quantity in product list
+                updateItemTotal(productId, 1, productPrice); // Update item total display in product list
+
+                renderCart();
+                updateGrandTotal();
+            }
+
+            function renderCart() {
+                const cartItemsTableBody = document.getElementById('cart-items');
+                cartItemsTableBody.innerHTML = ''; 
+
+                if (cart.length === 0) {
+                    cartItemsTableBody.innerHTML = '<tr><td colspan="5" class="empty-cart-message">Your cart is empty.</td></tr>';
+                    updateGrandTotal();
+                    return;
+                }
+
+                cart.forEach((item) => {
+                    const row = cartItemsTableBody.insertRow();
+                    row.insertCell(0).textContent = item.name;
+
+                    const quantityCell = row.insertCell(1);
+                    const quantityInputCart = document.createElement('input');
+                    quantityInputCart.type = 'number';
+                    quantityInputCart.className = 'quantity-input';
+                    quantityInputCart.value = item.quantity;
+                    quantityInputCart.min = 1;
+                    quantityInputCart.onchange = (event) => updateCartItemQuantity(item.id, parseInt(event.target.value));
+                    quantityCell.appendChild(quantityInputCart);
+
+                    row.insertCell(2).textContent = formatCurrency(item.price);
+                    row.insertCell(3).textContent = formatCurrency(item.itemTotal);
+                    row.cells[3].classList.add('total-price');
+
+                    const actionCell = row.insertCell(4);
+                    const removeButton = document.createElement('button');
+                    removeButton.textContent = 'Remove';
+                    removeButton.className = 'remove-btn';
+                    removeButton.onclick = () => removeFromCart(item.id);
+                    actionCell.appendChild(removeButton);
+                });
+                updateGrandTotal();
+            }
+
+            function updateCartItemQuantity(productId, newQuantity) {
+                const itemIndex = cart.findIndex(item => item.id === productId);
+                if (itemIndex > -1) {
+                    if (isNaN(newQuantity) || newQuantity < 1) {
+                        alert("Quantity in cart must be at least 1. To remove, use the 'Remove' button.");
+                        renderCart(); // Re-render to reset input to its previous valid state
+                        return;
+                    }
+                    cart[itemIndex].quantity = newQuantity;
+                    cart[itemIndex].itemTotal = cart[itemIndex].quantity * cart[itemIndex].price;
+                    renderCart(); 
+                    // updateGrandTotal() is called by renderCart if cart is not empty, or directly if it becomes empty
+                }
+            }
+
+            function removeFromCart(productId) {
+                cart = cart.filter(item => item.id !== productId);
+                renderCart();
+                // updateGrandTotal() is called by renderCart
+            }
+
+            function updateGrandTotal() {
+                const grandTotal = cart.reduce((total, item) => total + item.itemTotal, 0);
+                document.getElementById('grand-total').textContent = formatCurrency(grandTotal);
+            }
+
+            function checkout() {
+                if (cart.length === 0) {
+                    alert("Your cart is empty. Add some products before checking out.");
+                    return;
+                }
+                console.log("Checkout initiated. Cart data:", JSON.stringify(cart));
+                alert("Checkout process started! (See browser console for cart data). In a real application, this data would be sent to the server.");
+                // Example: cart = []; renderCart(); // To clear cart after checkout
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                renderCart(); // Initialize cart display (will show empty message)
+            });
+        /*]]>*/
+        </script>
+
+    </body>
+</html>
