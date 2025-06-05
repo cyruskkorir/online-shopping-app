@@ -23,8 +23,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers("/api/**") // Allow API requests
+            )
             .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/login", "/css/**", "/js/**").permitAll() // Allow access to login page and static resources
+                .requestMatchers("/login", "/css/**", "/js/**", "/api/**").permitAll() // Allow access to login page and static resources
                 .anyRequest().authenticated() // All other requests require authentication
             )
             .formLogin(formLogin -> formLogin

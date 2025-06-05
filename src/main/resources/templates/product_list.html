@@ -91,11 +91,16 @@
                     <strong>Grand Total: <span id="grand-total" class="total-price">0.00</span></strong>
                 </div>
                 <div style="text-align: right; margin-top: 10px;">
+                     <input type="email" id="customer-email" placeholder="Email for receipt" style="padding:8px; width:60%; margin-bottom:8px;" required>
                      <button onclick="checkout()" class="checkout-btn">Checkout</button>
                 </div>
+                <form id="stripe-form" style="display:none;">
+                    <input type="hidden" id="stripe-token" name="stripeToken">
+                </form>
             </div>
         </div>
 
+        <script src="https://js.stripe.com/v3/"></script>
         <script th:inline="javascript">
         /*<![CDATA[*/
             let cart = []; // Array to store cart items: { id, name, price, quantity, itemTotal }
@@ -228,16 +233,43 @@
                 const grandTotal = cart.reduce((total, item) => total + item.itemTotal, 0);
                 document.getElementById('grand-total').textContent = formatCurrency(grandTotal);
             }
+            
 
-            function checkout() {
+
+
+
+
+            async function checkout() {
                 if (cart.length === 0) {
                     alert("Your cart is empty. Add some products before checking out.");
                     return;
                 }
-                console.log("Checkout initiated. Cart data:", JSON.stringify(cart));
-                alert("Checkout process started! (See browser console for cart data). In a real application, this data would be sent to the server.");
-                // Example: cart = []; renderCart(); // To clear cart after checkout
+
+                const email = document.getElementById('customer-email').value;
+                if (!email) {
+                    alert("Please enter your email for the receipt.");
+                    return;
+                }
+
+                // Send cart and email to backend
+                const response = await fetch('/api/create-checkout-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ cart, email })
+                });
+
+                const session = await response.json();
+
+                if (session.id) {
+                    const stripe = Stripe('pk_test_51RVpEw2NBuFv7WZAl4VYUHvVBtW63t82C7kTV9FnDxm0XWrN4auIVQ5Qf0xFaP3U2FEPFXxY6PWHfIZSwxMOeqCI00P2FD0n33');
+                    stripe.redirectToCheckout({ sessionId: session.id });
+                } else {
+                    alert("Failed to create Stripe Checkout session.");
+                }
             }
+
 
             document.addEventListener('DOMContentLoaded', () => {
                 renderCart(); // Initialize cart display (will show empty message)
