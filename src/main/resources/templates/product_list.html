@@ -263,7 +263,8 @@
                 const session = await response.json();
 
                 if (session.id) {
-                    const stripe = Stripe('pk_test_51RVpEw2NBuFv7WZAl4VYUHvVBtW63t82C7kTV9FnDxm0XWrN4auIVQ5Qf0xFaP3U2FEPFXxY6PWHfIZSwxMOeqCI00P2FD0n33');
+                    // const stripe = Stripe('pk_test'); //Replace with your actual Stripe public key
+                    // const result = await stripe.redirectToCheckout({ sessionId: session.id });
                     stripe.redirectToCheckout({ sessionId: session.id });
                 } else {
                     alert("Failed to create Stripe Checkout session.");
